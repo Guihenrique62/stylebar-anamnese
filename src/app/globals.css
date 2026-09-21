@@ -1,19 +1,21 @@
 @import "tailwindcss";
 
 /*
-  Tokens da marca Stylebar.
-  Extraídos do site stylebarfranquia.com.br (laranja #EC7F17, azul-petróleo
-  #183C51, texto #2F2F2F, títulos em Bodoni Moda, UI em Work Sans).
+  Tokens da marca Stylebar: laranja, cinza e branco.
+  Laranja #EC7F17 (ação/acento), cinza escuro #2F2F2F (texto e superfícies escuras),
+  cinzas de apoio e branco. Títulos em Bodoni Moda, UI em Work Sans.
 */
 :root {
   --brand-primary: #ec7f17;
   --brand-primary-hover: #d06e10;
   --brand-primary-soft: #fdf1e6;
-  --brand-dark: #183c51;
-  --brand-accent: #47a7a6;
+  --brand-dark: #2f2f2f;
+  --brand-dark-hover: #1f1f1f;
 
   --background: #ffffff;
   --background-soft: #f9f9f9;
+  --gray-100: #f3f3f4;
+  --gray-200: #e5e5e7;
   --foreground: #2f2f2f;
   --muted: #7a7a7a;
   --border: #d7d7d9;
@@ -22,7 +24,7 @@
   --danger: #c62828;
 
   --radius-card: 14px;
-  --shadow-card: 0 0 27px 0 rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 2px 12px 0 rgba(0, 0, 0, 0.06);
 }
 
 @theme inline {
@@ -30,10 +32,12 @@
   --color-primary-hover: var(--brand-primary-hover);
   --color-primary-soft: var(--brand-primary-soft);
   --color-dark: var(--brand-dark);
-  --color-accent: var(--brand-accent);
+  --color-dark-hover: var(--brand-dark-hover);
 
   --color-background: var(--background);
   --color-background-soft: var(--background-soft);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
@@ -47,6 +51,10 @@
   --shadow-card: var(--shadow-card);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--background-soft);
   color: var(--foreground);
@@ -58,5 +66,25 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  color: var(--brand-dark);
+  color: var(--foreground);
+  letter-spacing: 0.01em;
+}
+
+/* Foco visível e consistente em toda a interface */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Controles com área de toque confortável. 16px evita o zoom automático no iOS. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+select,
+textarea {
+  font-size: 16px;
+  min-height: 44px;
+}
+
+/* Barras fixas respeitam o recorte inferior do celular */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }

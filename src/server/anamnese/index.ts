@@ -1,5 +1,7 @@
 /**
- * Serviços de anamnese: gerar link, validar token, salvar ficha, listar e
- * consultar fichas. Chamados por Server Actions e route handlers.
+ * Serviços de anamnese. Chamados por Server Actions e páginas; nunca importe o
+ * client do banco diretamente fora de src/server.
  */
-export {};
+export * from "./telefone";
+export * from "./pacientes";
+export * from "./fichas";

@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 !.env.example
+
+/src/generated/prisma
+
+# prisma client gerado
+/src/generated
+
+# symlinks locais das skills (apontam para caminhos absolutos desta máquina)
+/.claude/skills/

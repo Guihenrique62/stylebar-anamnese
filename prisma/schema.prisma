@@ -1,0 +1,271 @@
+// Schema do banco (Supabase Postgres). URLs de conexão ficam em prisma.config.ts.
+//
+// Segurança: as tabelas ficam no schema `public`, que o Supabase expõe na Data API.
+// A migração `rls_enable` habilita RLS sem políticas e revoga os grants de
+// anon/authenticated, de modo que só a aplicação (role postgres via Prisma) acessa os dados.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Pessoas
+// ---------------------------------------------------------------------------
+
+/// Terapeuta que acessa o /admin. `authUserId` é o id em auth.users (Supabase Auth).
+/// O registro é criado por upsert no primeiro login.
+model Terapeuta {
+  id         String   @id @default(uuid()) @db.Uuid
+  authUserId String   @unique @map("auth_user_id") @db.Uuid
+  nome       String
+  email      String   @unique
+  unidade    String?
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  revisoesMassoterapia FichaMassoterapia[] @relation("MassoterapiaRevisora")
+  revisoesHeadSpa      FichaHeadSpa[]      @relation("HeadSpaRevisora")
+  revisoesDepilacao    FichaDepilacao[]    @relation("DepilacaoRevisora")
+
+  @@map("terapeutas")
+}
+
+/// Cliente atendida. Identificada pelo telefone normalizado (só dígitos).
+/// Pode ter várias fichas do mesmo tipo (histórico de envios).
+model Paciente {
+  id             String    @id @default(uuid()) @db.Uuid
+  nome           String
+  telefone       String    @unique
+  email          String?
+  dataNascimento DateTime? @map("data_nascimento") @db.Date
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+  atualizadoEm   DateTime  @updatedAt @map("atualizado_em")
+
+  fichasMassoterapia FichaMassoterapia[]
+  fichasHeadSpa      FichaHeadSpa[]
+  fichasDepilacao    FichaDepilacao[]
+
+  @@map("pacientes")
+}
+
+// ---------------------------------------------------------------------------
+// Fichas (uma tabela por tipo, colunas fixas)
+// ---------------------------------------------------------------------------
+
+enum TipoFicha {
+  MASSOTERAPIA
+  HEAD_SPA
+  DEPILACAO
+}
+
+enum FichaStatus {
+  ENVIADA
+  REVISADA
+}
+
+enum NivelPressao {
+  BAIXA
+  NORMAL
+  ALTA
+}
+
+enum PressaoToque {
+  LEVE
+  MEDIA
+  FORTE
+}
+
+enum QualidadeSono {
+  RUIM
+  REGULAR
+  BOA
+}
+
+enum TipoCouro {
+  NORMAL
+  OLEOSO
+  SECO
+  MISTO
+  SENSIVEL
+}
+
+enum FrequenciaLavagem {
+  DIARIA
+  ALTERNADA
+  DUAS_VEZES_SEMANA
+  SEMANAL
+}
+
+enum MetodoDepilacao {
+  CERA_QUENTE
+  CERA_FRIA
+  ROLL_ON
+  LINHA
+  LAMINA
+  OUTRO
+}
+
+enum TipoPele {
+  NORMAL
+  SECA
+  OLEOSA
+  MISTA
+  SENSIVEL
+}
+
+/// Massoterapia (massagem/terapias corporais).
+model FichaMassoterapia {
+  id           String      @id @default(uuid()) @db.Uuid
+  status       FichaStatus @default(ENVIADA)
+  enviadaEm    DateTime    @default(now()) @map("enviada_em")
+  atualizadaEm DateTime    @updatedAt @map("atualizada_em")
+
+  pacienteId    String  @map("paciente_id") @db.Uuid
+  revisadaPorId String? @map("revisada_por_id") @db.Uuid
+
+  // consentimento
+  aceitaTermos Boolean @map("aceita_termos")
+  aceitaImagem Boolean @default(false) @map("aceita_imagem")
+
+  // queixa
+  queixaPrincipal       String  @map("queixa_principal")
+  tempoQueixa           String? @map("tempo_queixa")
+  nivelDor              Int     @default(0) @map("nivel_dor")
+  regioesDor            String? @map("regioes_dor")
+  tratamentosAnteriores String? @map("tratamentos_anteriores")
+
+  // saúde
+  doencasCronicas   String?      @map("doencas_cronicas")
+  cirurgias         String?
+  medicamentos      String?
+  alergias          String?
+  gestante          Boolean      @default(false)
+  lactante          Boolean      @default(false)
+  marcapassoProtese Boolean      @default(false) @map("marcapasso_protese")
+  varizesTrombose   Boolean      @default(false) @map("varizes_trombose")
+  pressaoArterial   NivelPressao @default(NORMAL) @map("pressao_arterial")
+
+  // hábitos
+  qualidadeSono   QualidadeSono @default(REGULAR) @map("qualidade_sono")
+  nivelEstresse   Int           @default(3) @map("nivel_estresse")
+  atividadeFisica String?       @map("atividade_fisica")
+
+  // preferências
+  pressaoToque  PressaoToque @default(MEDIA) @map("pressao_toque")
+  regioesEvitar String?      @map("regioes_evitar")
+  observacoes   String?
+
+  observacoesTerapeuta String? @map("observacoes_terapeuta")
+
+  paciente    Paciente   @relation(fields: [pacienteId], references: [id])
+  revisadaPor Terapeuta? @relation("MassoterapiaRevisora", fields: [revisadaPorId], references: [id])
+
+  @@index([status, enviadaEm])
+  @@index([pacienteId])
+  @@map("fichas_massoterapia")
+}
+
+/// Anamnese de Head Spa (couro cabeludo e cabelo).
+model FichaHeadSpa {
+  id           String      @id @default(uuid()) @db.Uuid
+  status       FichaStatus @default(ENVIADA)
+  enviadaEm    DateTime    @default(now()) @map("enviada_em")
+  atualizadaEm DateTime    @updatedAt @map("atualizada_em")
+
+  pacienteId    String  @map("paciente_id") @db.Uuid
+  revisadaPorId String? @map("revisada_por_id") @db.Uuid
+
+  aceitaTermos Boolean @map("aceita_termos")
+  aceitaImagem Boolean @default(false) @map("aceita_imagem")
+
+  // cabelo e couro cabeludo
+  tipoCabelo        String    @map("tipo_cabelo")
+  tipoCouro         TipoCouro @map("tipo_couro")
+  quedaCabelo       Boolean   @default(false) @map("queda_cabelo")
+  caspaDescamacao   Boolean   @default(false) @map("caspa_descamacao")
+  coceiraIrritacao  Boolean   @default(false) @map("coceira_irritacao")
+  feridasLesoes     Boolean   @default(false) @map("feridas_lesoes")
+  dermatitePsoriase Boolean   @default(false) @map("dermatite_psoriase")
+  alergiaCosmeticos String?   @map("alergia_cosmeticos")
+  quimicaRecente    String?   @map("quimica_recente")
+  dataQuimica       DateTime? @map("data_quimica") @db.Date
+
+  // hábitos
+  frequenciaLavagem FrequenciaLavagem @map("frequencia_lavagem")
+  usoCalor          Boolean           @default(false) @map("uso_calor")
+
+  // saúde
+  gestante                 Boolean @default(false)
+  hipertensao              Boolean @default(false)
+  enxaqueca                Boolean @default(false)
+  lentesAparelhoAuditivo   Boolean @default(false) @map("lentes_aparelho_auditivo")
+  sensibilidadeTemperatura Boolean @default(false) @map("sensibilidade_temperatura")
+
+  objetivo    String
+  observacoes String?
+
+  observacoesTerapeuta String? @map("observacoes_terapeuta")
+
+  paciente    Paciente   @relation(fields: [pacienteId], references: [id])
+  revisadaPor Terapeuta? @relation("HeadSpaRevisora", fields: [revisadaPorId], references: [id])
+
+  @@index([status, enviadaEm])
+  @@index([pacienteId])
+  @@map("fichas_head_spa")
+}
+
+/// Anamnese de Depilação (cera e outros métodos).
+model FichaDepilacao {
+  id           String      @id @default(uuid()) @db.Uuid
+  status       FichaStatus @default(ENVIADA)
+  enviadaEm    DateTime    @default(now()) @map("enviada_em")
+  atualizadaEm DateTime    @updatedAt @map("atualizada_em")
+
+  pacienteId    String  @map("paciente_id") @db.Uuid
+  revisadaPorId String? @map("revisada_por_id") @db.Uuid
+
+  aceitaTermos Boolean @map("aceita_termos")
+  aceitaImagem Boolean @default(false) @map("aceita_imagem")
+
+  // depilação
+  areas           String
+  metodoPreferido MetodoDepilacao @map("metodo_preferido")
+  metodoAtual     String?         @map("metodo_atual")
+  ultimaDepilacao DateTime?       @map("ultima_depilacao") @db.Date
+  primeiraVezCera Boolean         @default(false) @map("primeira_vez_cera")
+
+  // pele
+  tipoPele          TipoPele @map("tipo_pele")
+  pelosEncravados   Boolean  @default(false) @map("pelos_encravados")
+  foliculite        Boolean  @default(false)
+  lesoesPele        String?  @map("lesoes_pele")
+  manchasCicatrizes String?  @map("manchas_cicatrizes")
+  alergiaCosmeticos String?  @map("alergia_cosmeticos")
+
+  // saúde
+  usoAcidosRetinoides    Boolean @default(false) @map("uso_acidos_retinoides")
+  exposicaoSolarRecente  Boolean @default(false) @map("exposicao_solar_recente")
+  gestante               Boolean @default(false)
+  diabetes               Boolean @default(false)
+  varizes                Boolean @default(false)
+  problemasCirculatorios Boolean @default(false) @map("problemas_circulatorios")
+  anticoagulantes        Boolean @default(false)
+  medicamentos           String?
+  alergias               String?
+
+  observacoes String?
+
+  observacoesTerapeuta String? @map("observacoes_terapeuta")
+
+  paciente    Paciente   @relation(fields: [pacienteId], references: [id])
+  revisadaPor Terapeuta? @relation("DepilacaoRevisora", fields: [revisadaPorId], references: [id])
+
+  @@index([status, enviadaEm])
+  @@index([pacienteId])
+  @@map("fichas_depilacao")
+}

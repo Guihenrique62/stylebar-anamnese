@@ -1,81 +1,26 @@
 /**
  * Modelo de domínio do sistema de anamnese.
- * Serve de contrato entre formulário público, painel e camada de dados.
+ * Os tipos vêm do Prisma (banco) e dos schemas Zod (entrada dos formulários).
  */
 
-export type Terapeuta = {
-  id: string;
-  nome: string;
-  email: string;
-  unidade?: string;
-  criadoEm: Date;
-};
+export type {
+  Terapeuta,
+  Paciente,
+  FichaMassoterapia,
+  FichaHeadSpa,
+  FichaDepilacao,
+} from "@/generated/prisma/client";
 
-export type Paciente = {
-  id: string;
-  nome: string;
-  telefone: string;
-  email?: string;
-  dataNascimento?: Date;
-  criadoEm: Date;
-};
+export type { TipoFicha, FichaStatus } from "@/generated/prisma/enums";
 
-export type LinkStatus = "ativo" | "usado" | "expirado";
+export type {
+  DadosPessoais,
+  Consentimento,
+  FichaMassoterapiaInput,
+  FichaHeadSpaInput,
+  FichaDepilacaoInput,
+  EnvioInput,
+  TipoSlug,
+} from "@/lib/validation/anamnese";
 
-/** Link único enviado à cliente para preencher a ficha. */
-export type LinkAnamnese = {
-  id: string;
-  token: string;
-  terapeutaId: string;
-  pacienteId?: string;
-  status: LinkStatus;
-  expiraEm: Date;
-  criadoEm: Date;
-};
-
-export type FichaStatus = "enviada" | "revisada";
-
-export type FichaAnamnese = {
-  id: string;
-  linkId: string;
-  pacienteId: string;
-  terapeutaId: string;
-  status: FichaStatus;
-  respostas: RespostasAnamnese;
-  observacoesTerapeuta?: string;
-  enviadaEm: Date;
-};
-
-/** Respostas do formulário. Os campos serão refinados com as terapeutas. */
-export type RespostasAnamnese = {
-  dadosPessoais: {
-    nome: string;
-    telefone: string;
-    email?: string;
-    dataNascimento?: string;
-    profissao?: string;
-  };
-  saude: {
-    alergias?: string;
-    medicamentos?: string;
-    gestante: boolean;
-    condicoes: string[];
-    cirurgiasRecentes?: string;
-  };
-  habitos: {
-    exposicaoSolar: "baixa" | "media" | "alta";
-    fumante: boolean;
-    consumoAgua?: string;
-    atividadeFisica?: string;
-  };
-  procedimento: {
-    servicoDesejado: string;
-    procedimentosAnteriores?: string;
-    expectativa?: string;
-  };
-  consentimento: {
-    aceitaTermos: boolean;
-    aceitaImagem: boolean;
-    assinadoEm: string;
-  };
-};
+export type { FichaResumo, FichaDetalhe } from "@/server/anamnese/fichas";
