@@ -132,7 +132,21 @@ Abra http://localhost:3000. Node 26 (ver `.nvmrc`).
 - [x] Depilação com perguntas oficiais
 - [x] Massoterapia com perguntas oficiais
 - [ ] Recuperação de senha (Supabase Auth)
-- [ ] Deploy na Vercel
+- [ ] Deploy na Vercel (em andamento; ver seção abaixo)
+
+## Deploy na Vercel
+
+Conecte o repositório e cadastre as variáveis em Settings > Environment Variables (Production e Preview):
+
+| Variável | Tipo na Vercel | Observação |
+| --- | --- | --- |
+| `DATABASE_URL` | Sensitive | Pooler em modo transação (6543, `pgbouncer=true`) |
+| `DIRECT_URL` | Sensitive | Pooler em modo sessão (5432), usado pelas migrações |
+| `NEXT_PUBLIC_SUPABASE_URL` | Plaintext | Pública por design; a Vercel recusa `NEXT_PUBLIC_*` como Sensitive |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Plaintext | Chave publishable, nunca a secret |
+| `NEXT_PUBLIC_APP_URL` | Plaintext, opcional | Se ausente, usa a URL de produção/preview do projeto |
+
+O `https://` pode ser omitido nas URLs; o código completa. Variáveis `NEXT_PUBLIC_*` entram no build, então qualquer alteração exige um novo deploy. As migrações não rodam no deploy: aplique com `npm run db:deploy` a partir da sua máquina (usa `DIRECT_URL`) antes de publicar mudanças de schema.
 
 ## Configuração do Supabase
 
