@@ -48,7 +48,11 @@ export default async function FichaDetalhePage(props: PageProps<"/admin/fichas/[
       <Card className="mt-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-2xl leading-tight sm:text-3xl">{ficha.paciente.nome}</h1>
+            <h1 className="text-2xl leading-tight sm:text-3xl">
+              <Link href={`/admin/pacientes/${ficha.paciente.id}`} className="hover:text-primary hover:underline">
+                {ficha.paciente.nome}
+              </Link>
+            </h1>
             <p className="mt-1 text-sm text-muted">
               <a href={`tel:+55${ficha.paciente.telefone}`} className="font-medium text-primary underline-offset-4 hover:underline">
                 {ficha.paciente.telefone}

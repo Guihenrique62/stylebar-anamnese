@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Busca } from "@/components/painel/filtros";
+import { Chevron } from "@/components/painel/lista-fichas";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/utils";
@@ -33,19 +35,25 @@ export default async function PacientesPage(props: PageProps<"/admin/pacientes">
           <>
             <ul className="flex flex-col gap-3 md:hidden">
               {pacientes.map((p) => (
-                <li key={p.id} className="rounded-(--radius-card) border border-gray-200 bg-background p-4 shadow-(--shadow-card)">
-                  <p className="font-medium">{p.nome}</p>
-                  <p className="mt-0.5 text-sm">
-                    <a href={`tel:+55${p.telefone}`} className="text-primary underline-offset-4 hover:underline">
-                      {p.telefone}
-                    </a>
-                    {p.email ? <span className="text-muted"> · {p.email}</span> : null}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Contagem rotulo="Masso" n={p._count.fichasMassoterapia} />
-                    <Contagem rotulo="Head Spa" n={p._count.fichasHeadSpa} />
-                    <Contagem rotulo="Depilação" n={p._count.fichasDepilacao} />
-                  </div>
+                <li key={p.id}>
+                  <Link
+                    href={`/admin/pacientes/${p.id}`}
+                    className="flex items-center gap-3 rounded-(--radius-card) border border-gray-200 bg-background p-4 shadow-(--shadow-card) active:bg-gray-100"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{p.nome}</span>
+                      <span className="mt-0.5 block text-sm text-muted">
+                        {p.telefone}
+                        {p.email ? ` · ${p.email}` : ""}
+                      </span>
+                      <span className="mt-3 flex flex-wrap gap-2">
+                        <Contagem rotulo="Masso" n={p._count.fichasMassoterapia} />
+                        <Contagem rotulo="Head Spa" n={p._count.fichasHeadSpa} />
+                        <Contagem rotulo="Depilação" n={p._count.fichasDepilacao} />
+                      </span>
+                    </span>
+                    <Chevron />
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -61,18 +69,32 @@ export default async function PacientesPage(props: PageProps<"/admin/pacientes">
                     <th className="px-4 py-3 text-center font-medium">Head Spa</th>
                     <th className="px-4 py-3 text-center font-medium">Depilação</th>
                     <th className="px-4 py-3 font-medium">Cadastro</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {pacientes.map((p) => (
                     <tr key={p.id} className="border-t border-gray-200 hover:bg-background-soft">
-                      <td className="px-4 py-3 font-medium">{p.nome}</td>
-                      <td className="px-4 py-3">{p.telefone}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <Link href={`/admin/pacientes/${p.id}`} className="hover:text-primary hover:underline">
+                          {p.nome}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <a href={`tel:+55${p.telefone}`} className="text-primary underline-offset-4 hover:underline">
+                          {p.telefone}
+                        </a>
+                      </td>
                       <td className="px-4 py-3">{p.email ?? "—"}</td>
                       <td className="px-4 py-3 text-center">{p._count.fichasMassoterapia}</td>
                       <td className="px-4 py-3 text-center">{p._count.fichasHeadSpa}</td>
                       <td className="px-4 py-3 text-center">{p._count.fichasDepilacao}</td>
                       <td className="px-4 py-3">{formatDate(p.criadoEm)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Link href={`/admin/pacientes/${p.id}`} className="font-medium text-primary hover:underline">
+                          Abrir
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
