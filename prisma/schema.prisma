@@ -68,57 +68,79 @@ enum FichaStatus {
   REVISADA
 }
 
-enum NivelPressao {
-  BAIXA
-  NORMAL
-  ALTA
+enum ObjetivoMassagem {
+  RELAXAMENTO
+  REDUCAO_ESTRESSE
+  ALIVIO_DORES
+  RELAXAMENTO_MUSCULAR
+  BEM_ESTAR
+  OUTRO
 }
 
-enum PressaoToque {
+enum PressaoArterial {
+  NAO
+  SIM
+  NAO_SEI
+}
+
+enum ProdutoMassagem {
+  OLEO
+  CREME
+  SEM_PREFERENCIA
+}
+
+enum PressaoMassagem {
   LEVE
-  MEDIA
+  MODERADA
   FORTE
 }
 
-enum QualidadeSono {
-  RUIM
-  REGULAR
-  BOA
+enum ObjetivoHeadSpa {
+  RELAXAMENTO
+  REDUCAO_ESTRESSE
+  HIGIENIZACAO_PROFUNDA
+  CONTROLE_OLEOSIDADE
+  ALIVIO_SENSIBILIDADE
+  QUEDA_CAPILAR
+  OUTRO
 }
 
-enum TipoCouro {
-  NORMAL
-  OLEOSO
-  SECO
-  MISTO
-  SENSIVEL
+enum TipoCabelo {
+  LISO
+  ONDULADO
+  CACHEADO
+  CRESPO
 }
 
-enum FrequenciaLavagem {
-  DIARIA
-  ALTERNADA
-  DUAS_VEZES_SEMANA
-  SEMANAL
+enum IntensidadeMassagem {
+  SUAVE
+  MODERADA
+  FORTE
+}
+
+enum AreaDepilacao {
+  BUCO
+  ROSTO
+  AXILAS
+  BRACOS
+  PERNAS
+  VIRILHA
+  INTIMA_COMPLETA
+  COSTAS
+  ABDOMEN
+  OUTRA
 }
 
 enum MetodoDepilacao {
   CERA_QUENTE
   CERA_FRIA
-  ROLL_ON
-  LINHA
   LAMINA
-  OUTRO
+  CREME_DEPILATORIO
+  LINHA
+  LASER
 }
 
-enum TipoPele {
-  NORMAL
-  SECA
-  OLEOSA
-  MISTA
-  SENSIVEL
-}
-
-/// Massoterapia (massagem/terapias corporais).
+/// Anamnese de Massoterapia. Perguntas oficiais da ficha em papel (2026-09-21).
 model FichaMassoterapia {
   id           String      @id @default(uuid()) @db.Uuid
   status       FichaStatus @default(ENVIADA)
@@ -128,37 +150,42 @@ model FichaMassoterapia {
   pacienteId    String  @map("paciente_id") @db.Uuid
   revisadaPorId String? @map("revisada_por_id") @db.Uuid
 
-  // consentimento
   aceitaTermos Boolean @map("aceita_termos")
   aceitaImagem Boolean @default(false) @map("aceita_imagem")
 
-  // queixa
-  queixaPrincipal       String  @map("queixa_principal")
-  tempoQueixa           String? @map("tempo_queixa")
-  nivelDor              Int     @default(0) @map("nivel_dor")
-  regioesDor            String? @map("regioes_dor")
-  tratamentosAnteriores String? @map("tratamentos_anteriores")
+  // 2. objetivo do atendimento
+  objetivos     ObjetivoMassagem[]
+  objetivoOutro String?            @map("objetivo_outro")
+  regiaoAtencao String?            @map("regiao_atencao")
 
-  // saúde
-  doencasCronicas   String?      @map("doencas_cronicas")
-  cirurgias         String?
-  medicamentos      String?
-  alergias          String?
-  gestante          Boolean      @default(false)
-  lactante          Boolean      @default(false)
-  marcapassoProtese Boolean      @default(false) @map("marcapasso_protese")
-  varizesTrombose   Boolean      @default(false) @map("varizes_trombose")
-  pressaoArterial   NivelPressao @default(NORMAL) @map("pressao_arterial")
+  // 3. condições de saúde
+  problemaCardiaco         Boolean         @default(false) @map("problema_cardiaco")
+  problemaCardiacoQual     String?         @map("problema_cardiaco_qual")
+  problemaRespiratorio     Boolean         @default(false) @map("problema_respiratorio")
+  problemaRespiratorioQual String?         @map("problema_respiratorio_qual")
+  problemaColuna           Boolean         @default(false) @map("problema_coluna")
+  problemaColunaQual       String?         @map("problema_coluna_qual")
+  problemaMuscular         Boolean         @default(false) @map("problema_muscular")
+  problemaMuscularQual     String?         @map("problema_muscular_qual")
+  problemaPele             Boolean         @default(false) @map("problema_pele")
+  problemaPeleQual         String?         @map("problema_pele_qual")
+  pressaoArterial          PressaoArterial @map("pressao_arterial")
+  medicamentoContinuo      Boolean         @default(false) @map("medicamento_continuo")
+  medicamentoQuais         String?         @map("medicamento_quais")
+  alergiaProdutos          Boolean         @default(false) @map("alergia_produtos")
+  alergiaProdutosQual      String?         @map("alergia_produtos_qual")
+  gestante                 Boolean         @default(false)
+  gestanteSemanas          String?         @map("gestante_semanas")
+  outraCondicao            String?         @map("outra_condicao")
 
-  // hábitos
-  qualidadeSono   QualidadeSono @default(REGULAR) @map("qualidade_sono")
-  nivelEstresse   Int           @default(3) @map("nivel_estresse")
-  atividadeFisica String?       @map("atividade_fisica")
-
-  // preferências
-  pressaoToque  PressaoToque @default(MEDIA) @map("pressao_toque")
-  regioesEvitar String?      @map("regioes_evitar")
-  observacoes   String?
+  // 4. preferências para a massagem
+  produto             ProdutoMassagem
+  pressao             PressaoMassagem
+  regiaoEvitar        String?         @map("regiao_evitar")
+  jaFezMassagem       Boolean         @default(false) @map("ja_fez_massagem")
+  experienciaAnterior String?         @map("experiencia_anterior")
+  naoGostou           String?         @map("nao_gostou")
+  preferencias        String?
 
   observacoesTerapeuta String? @map("observacoes_terapeuta")
 
@@ -170,7 +197,7 @@ model FichaMassoterapia {
   @@map("fichas_massoterapia")
 }
 
-/// Anamnese de Head Spa (couro cabeludo e cabelo).
+/// Anamnese de Head Spa. Perguntas oficiais da ficha em papel (2026-09-21).
 model FichaHeadSpa {
   id           String      @id @default(uuid()) @db.Uuid
   status       FichaStatus @default(ENVIADA)
@@ -183,30 +210,38 @@ model FichaHeadSpa {
   aceitaTermos Boolean @map("aceita_termos")
   aceitaImagem Boolean @default(false) @map("aceita_imagem")
 
-  // cabelo e couro cabeludo
-  tipoCabelo        String    @map("tipo_cabelo")
-  tipoCouro         TipoCouro @map("tipo_couro")
-  quedaCabelo       Boolean   @default(false) @map("queda_cabelo")
-  caspaDescamacao   Boolean   @default(false) @map("caspa_descamacao")
-  coceiraIrritacao  Boolean   @default(false) @map("coceira_irritacao")
-  feridasLesoes     Boolean   @default(false) @map("feridas_lesoes")
-  dermatitePsoriase Boolean   @default(false) @map("dermatite_psoriase")
-  alergiaCosmeticos String?   @map("alergia_cosmeticos")
-  quimicaRecente    String?   @map("quimica_recente")
-  dataQuimica       DateTime? @map("data_quimica") @db.Date
+  // 2. objetivo do atendimento
+  objetivos     ObjetivoHeadSpa[]
+  objetivoOutro String?           @map("objetivo_outro")
 
-  // hábitos
-  frequenciaLavagem FrequenciaLavagem @map("frequencia_lavagem")
-  usoCalor          Boolean           @default(false) @map("uso_calor")
+  // 3. histórico capilar
+  couroSensivel         Boolean @default(false) @map("couro_sensivel")
+  coceira               Boolean @default(false)
+  descamacaoCaspa       Boolean @default(false) @map("descamacao_caspa")
+  oleosidadeExcessiva   Boolean @default(false) @map("oleosidade_excessiva")
+  feridasLesoes         Boolean @default(false) @map("feridas_lesoes")
+  vermelhidaoIrritacao  Boolean @default(false) @map("vermelhidao_irritacao")
+  dorSensibilidadeToque Boolean @default(false) @map("dor_sensibilidade_toque")
+  quedaIntensa          Boolean @default(false) @map("queda_intensa")
+  doencaCouro           Boolean @default(false) @map("doenca_couro")
+  doencaCouroQual       String? @map("doenca_couro_qual")
 
-  // saúde
-  gestante                 Boolean @default(false)
-  hipertensao              Boolean @default(false)
-  enxaqueca                Boolean @default(false)
-  lentesAparelhoAuditivo   Boolean @default(false) @map("lentes_aparelho_auditivo")
-  sensibilidadeTemperatura Boolean @default(false) @map("sensibilidade_temperatura")
+  // 4. informações de saúde
+  alergia             Boolean @default(false)
+  alergiaQual         String? @map("alergia_qual")
+  gestante            Boolean @default(false)
+  problemaCardiaco    Boolean @default(false) @map("problema_cardiaco")
+  medicamentoContinuo Boolean @default(false) @map("medicamento_continuo")
+  medicamentoQual     String? @map("medicamento_qual")
 
-  objetivo    String
+  // 5. características dos cabelos
+  tipoCabelo       TipoCabelo @map("tipo_cabelo")
+  quimicaColoracao Boolean    @default(false) @map("quimica_coloracao")
+  quimicaQual      String?    @map("quimica_qual")
+
+  // 6. preferência de massagem capilar
+  intensidadeMassagem IntensidadeMassagem @map("intensidade_massagem")
+
   observacoes String?
 
   observacoesTerapeuta String? @map("observacoes_terapeuta")
@@ -219,7 +254,7 @@ model FichaHeadSpa {
   @@map("fichas_head_spa")
 }
 
-/// Anamnese de Depilação (cera e outros métodos).
+/// Anamnese de Depilação. Perguntas oficiais da ficha em papel (2026-09-21).
 model FichaDepilacao {
   id           String      @id @default(uuid()) @db.Uuid
   status       FichaStatus @default(ENVIADA)
@@ -232,33 +267,41 @@ model FichaDepilacao {
   aceitaTermos Boolean @map("aceita_termos")
   aceitaImagem Boolean @default(false) @map("aceita_imagem")
 
-  // depilação
-  areas           String
-  metodoPreferido MetodoDepilacao @map("metodo_preferido")
-  metodoAtual     String?         @map("metodo_atual")
-  ultimaDepilacao DateTime?       @map("ultima_depilacao") @db.Date
-  primeiraVezCera Boolean         @default(false) @map("primeira_vez_cera")
+  // 2. área a ser depilada
+  areas     AreaDepilacao[]
+  areaOutra String?         @map("area_outra")
 
-  // pele
-  tipoPele          TipoPele @map("tipo_pele")
-  pelosEncravados   Boolean  @default(false) @map("pelos_encravados")
-  foliculite        Boolean  @default(false)
-  lesoesPele        String?  @map("lesoes_pele")
-  manchasCicatrizes String?  @map("manchas_cicatrizes")
-  alergiaCosmeticos String?  @map("alergia_cosmeticos")
+  // 3. histórico da pele
+  peleSensivel         Boolean @default(false) @map("pele_sensivel")
+  alergiaCosmetico     Boolean @default(false) @map("alergia_cosmetico")
+  alergiaCosmeticoQual String? @map("alergia_cosmetico_qual")
+  doencaPele           Boolean @default(false) @map("doenca_pele")
+  doencaPeleQual       String? @map("doenca_pele_qual")
+  feridasCortes        Boolean @default(false) @map("feridas_cortes")
+  irritacaoVermelhidao Boolean @default(false) @map("irritacao_vermelhidao")
+  foliculiteEncravados Boolean @default(false) @map("foliculite_encravados")
+  manchasSensibilidade Boolean @default(false) @map("manchas_sensibilidade")
 
-  // saúde
-  usoAcidosRetinoides    Boolean @default(false) @map("uso_acidos_retinoides")
-  exposicaoSolarRecente  Boolean @default(false) @map("exposicao_solar_recente")
+  // 4. informações de saúde
   gestante               Boolean @default(false)
-  diabetes               Boolean @default(false)
-  varizes                Boolean @default(false)
-  problemasCirculatorios Boolean @default(false) @map("problemas_circulatorios")
-  anticoagulantes        Boolean @default(false)
-  medicamentos           String?
-  alergias               String?
+  medicamentoContinuo    Boolean @default(false) @map("medicamento_continuo")
+  medicamentoQual        String? @map("medicamento_qual")
+  produtoAcne            Boolean @default(false) @map("produto_acne")
+  produtoAcneQual        String? @map("produto_acne_qual")
+  procedimentoEstetico   Boolean @default(false) @map("procedimento_estetico")
+  procedimentoQualQuando String? @map("procedimento_qual_quando")
+  alergiaConhecida       Boolean @default(false) @map("alergia_conhecida")
+  alergiaConhecidaQual   String? @map("alergia_conhecida_qual")
 
-  observacoes String?
+  // 5. histórico de depilação
+  jaDepilou      Boolean           @default(false) @map("ja_depilou")
+  metodos        MetodoDepilacao[]
+  laserDetalhe   String?           @map("laser_detalhe")
+  reacaoAnterior Boolean           @default(false) @map("reacao_anterior")
+  reacaoQual     String?           @map("reacao_qual")
+
+  // 6. preferências e observações
+  preferencias String?
 
   observacoesTerapeuta String? @map("observacoes_terapeuta")
 

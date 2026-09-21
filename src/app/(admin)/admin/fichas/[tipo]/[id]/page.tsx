@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CONSENTIMENTO, SECOES_POR_TIPO, type Campo } from "@/components/anamnese/campos";
-import { StatusBadge } from "@/components/ui/badge";
+import { SECOES_POR_TIPO, consentimento, type Campo } from "@/components/anamnese/campos";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { TextArea } from "@/components/ui/field";
@@ -31,7 +31,7 @@ export default async function FichaDetalhePage(props: PageProps<"/admin/fichas/[
 
   // Acesso genérico às colunas para exibir com os rótulos de campos.ts
   const valores = ficha as unknown as Record<string, unknown>;
-  const secoes = [...SECOES_POR_TIPO[tipo], CONSENTIMENTO];
+  const secoes = [...SECOES_POR_TIPO[tipo], consentimento(tipo)];
   const nascimento = ficha.paciente.dataNascimento
     ? new Intl.DateTimeFormat("pt-BR").format(ficha.paciente.dataNascimento)
     : null;
@@ -122,7 +122,20 @@ export default async function FichaDetalhePage(props: PageProps<"/admin/fichas/[
 }
 
 function Valor({ campo, valor }: { campo: Campo; valor: unknown }) {
-  if (campo.tipo === "checkbox") {
+  if (campo.tipo === "multi") {
+    const lista = Array.isArray(valor) ? (valor as string[]) : [];
+    if (lista.length === 0) return <span className="text-muted">—</span>;
+    return (
+      <span className="flex flex-wrap gap-1.5">
+        {lista.map((v) => (
+          <Badge key={v} tom="laranja">
+            {campo.opcoes.find((o) => o.valor === v)?.rotulo ?? v}
+          </Badge>
+        ))}
+      </span>
+    );
+  }
+  if (campo.tipo === "checkbox" || campo.tipo === "simnao") {
     return valor ? (
       <span className="inline-flex items-center gap-1.5 font-medium text-primary">
         <span className="size-2 rounded-full bg-primary" /> Sim
@@ -134,7 +147,7 @@ function Valor({ campo, valor }: { campo: Campo; valor: unknown }) {
     );
   }
   if (valor === null || valor === undefined || valor === "") return <span className="text-muted">—</span>;
-  if (campo.tipo === "select") return <>{campo.opcoes.find((o) => o.valor === valor)?.rotulo ?? String(valor)}</>;
+  if (campo.tipo === "select" || campo.tipo === "radio") return <>{campo.opcoes.find((o) => o.valor === valor)?.rotulo ?? String(valor)}</>;
   if (valor instanceof Date) return <>{new Intl.DateTimeFormat("pt-BR").format(valor)}</>;
   if (campo.tipo === "numero") {
     return (

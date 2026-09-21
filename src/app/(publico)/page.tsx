@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ICONE_POR_TIPO } from "@/components/anamnese/icones";
-import { Button } from "@/components/ui/button";
 import { BrandBar } from "@/components/ui/page-header";
 import { NOME_POR_TIPO, SLUG_POR_TIPO, TIPOS } from "@/lib/validation/anamnese";
 
@@ -22,7 +21,7 @@ export default function EscolherTipoPage() {
       </BrandBar>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-10 pt-6">
-        <h1 className="text-2xl sm:text-3xl">Qual atendimento você vai fazer?</h1>
+        <h1 className="text-2xl sm:text-3xl">Selecione a terapia a ser realizada</h1>
         <p className="mt-2 text-sm text-muted sm:text-base">
           Preencha a ficha antes da sua sessão. Leva poucos minutos e suas respostas são confidenciais.
         </p>
@@ -52,12 +51,6 @@ export default function EscolherTipoPage() {
             );
           })}
         </ul>
-
-        <div className="mt-10 flex justify-center">
-          <Button href="/admin" variante="ghost" tamanho="md">
-            Acesso das terapeutas
-          </Button>
-        </div>
       </main>
     </div>
   );

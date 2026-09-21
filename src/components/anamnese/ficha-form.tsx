@@ -1,28 +1,46 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import type { z } from "zod";
 import type { TipoFicha } from "@/generated/prisma/enums";
 import { enviarFicha, type EnvioState } from "@/app/(publico)/ficha/[tipo]/actions";
-import { ENVIO_SCHEMA, formatarErros } from "@/lib/validation/anamnese";
+import { ENVIO_SCHEMA, errosDasRegras, formDataParaObjeto, formatarErros } from "@/lib/validation/anamnese";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox, Field, NumberScale, PhoneInput, Select, TextArea, TextInput } from "@/components/ui/field";
+import {
+  Checkbox,
+  CheckboxGroup,
+  Field,
+  NumberScale,
+  PhoneInput,
+  RadioGroup,
+  Select,
+  SimNao,
+  TextArea,
+  TextInput,
+} from "@/components/ui/field";
 import type { Campo, Secao } from "./campos";
 import { Progresso } from "./progresso";
 
 type Props = { tipo: TipoFicha; tipoSlug: string; secoes: Secao[] };
 
+/** Campo dependente só conta (e só aparece) quando a condição vale. */
+function visivel(campo: Campo, valores: Record<string, unknown>) {
+  if (!campo.dependeDe) return true;
+  const v = valores[campo.dependeDe.campo];
+  return Array.isArray(v) ? v.includes(campo.dependeDe.valor) : v === campo.dependeDe.valor;
+}
+
 /**
  * Formulário público em etapas (uma seção por tela). Todas as etapas ficam no mesmo
  * <form>; as inativas ficam ocultas, então o FormData final tem todos os campos e a
- * Server Action recebe tudo de uma vez. A validação por etapa roda no cliente com o
- * mesmo schema Zod do servidor.
+ * Server Action recebe tudo de uma vez. A validação por etapa roda o schema completo
+ * no cliente e mostra só os erros dos campos da etapa atual.
  */
 export function FichaForm({ tipo, tipoSlug, secoes }: Props) {
   const [state, action, pending] = useActionState<EnvioState, FormData>(enviarFicha, undefined);
   const [etapa, setEtapa] = useState(0);
   const [errosCliente, setErrosCliente] = useState<Record<string, string>>({});
+  const [valoresAtuais, setValoresAtuais] = useState<Record<string, unknown>>({});
   const formRef = useRef<HTMLFormElement>(null);
   const topoRef = useRef<HTMLDivElement>(null);
 
@@ -46,27 +64,27 @@ export function FichaForm({ tipo, tipoSlug, secoes }: Props) {
     if (state && state.ok === false) topoRef.current?.scrollIntoView({ block: "start" });
   }, [state]);
 
-  function validarEtapa(): boolean {
+  function lerValores() {
     const form = formRef.current;
-    if (!form) return true;
-    const nomes = secoes[etapa].campos.map((c) => c.nome);
-    // Os três schemas têm shapes diferentes; para o pick por etapa basta tratá-los como objeto genérico.
-    const schema = ENVIO_SCHEMA[tipo] as unknown as z.ZodObject<z.ZodRawShape>;
-    const parcial = schema.pick(Object.fromEntries(nomes.map((n) => [n, true])));
-    const fd = new FormData(form);
-    const dados: Record<string, unknown> = {};
-    for (const n of nomes) dados[n] = fd.get(n) ?? undefined;
+    return form ? formDataParaObjeto(new FormData(form)) : {};
+  }
 
-    const r = parcial.safeParse(dados);
-    if (r.success) {
-      setErrosCliente({});
-      return true;
-    }
-    const e = formatarErros(r.error);
-    setErrosCliente(e);
-    const primeiro = Object.keys(e)[0];
-    const el = form.querySelector<HTMLElement>(`[name="${primeiro}"]`);
-    el?.focus();
+  function validarEtapa(): boolean {
+    const valores = lerValores();
+    const nomesEtapa = new Set(secoes[etapa].campos.filter((c) => visivel(c, valores)).map((c) => c.nome));
+    const r = ENVIO_SCHEMA[tipo].safeParse(valores);
+    // Regras condicionais rodam à parte: o Zod pula o superRefine quando há outros erros
+    // (e em etapas anteriores sempre há campos das etapas seguintes ainda vazios).
+    const todos = { ...(r.success ? {} : formatarErros(r.error)), ...errosDasRegras(tipo, valores) };
+    const daEtapa = Object.fromEntries(Object.entries(todos).filter(([k]) => nomesEtapa.has(k)));
+    setErrosCliente(daEtapa);
+    if (Object.keys(daEtapa).length === 0) return true;
+
+    const primeiro = Object.keys(daEtapa)[0];
+    const el = formRef.current?.querySelector<HTMLElement>(`[name="${primeiro}"]`);
+    const alvo = (el?.closest("[role=radiogroup]") as HTMLElement | null) ?? el;
+    alvo?.scrollIntoView({ block: "center", behavior: "smooth" });
+    el?.focus({ preventScroll: true });
     return false;
   }
 
@@ -86,6 +104,7 @@ export function FichaForm({ tipo, tipoSlug, secoes }: Props) {
     <form
       ref={formRef}
       action={action}
+      onChange={() => setValoresAtuais(lerValores())}
       onSubmit={(e) => {
         if (!ultima || !validarEtapa()) e.preventDefault();
       }}
@@ -112,7 +131,9 @@ export function FichaForm({ tipo, tipoSlug, secoes }: Props) {
             <legend className="sr-only">{secao.titulo}</legend>
             <Card className="flex flex-col gap-5">
               {secao.campos.map((campo) => (
-                <CampoInput key={campo.nome} campo={campo} valor={state?.valores?.[campo.nome]} erro={erros[campo.nome]} />
+                <div key={campo.nome} hidden={!visivel(campo, valoresAtuais)}>
+                  <CampoInput campo={campo} valor={state?.valores?.[campo.nome]} erro={erros[campo.nome]} />
+                </div>
               ))}
             </Card>
           </fieldset>
@@ -149,15 +170,16 @@ export function FichaForm({ tipo, tipoSlug, secoes }: Props) {
 
 function CampoInput({ campo, valor, erro }: { campo: Campo; valor: unknown; erro?: string }) {
   const valorStr = typeof valor === "string" ? valor : undefined;
+  const valorArr = Array.isArray(valor) ? (valor as string[]) : valorStr ? [valorStr] : undefined;
 
   if (campo.tipo === "checkbox") {
-    return <Checkbox nome={campo.nome} rotulo={campo.rotulo} defaultChecked={valorStr === "on"} erro={erro} />;
+    return <Checkbox nome={campo.nome} rotulo={campo.rotulo} defaultChecked={valorStr === "on"} erro={erro} ajuda={campo.ajuda} />;
   }
 
   const obrigatorio = "obrigatorio" in campo && campo.obrigatorio;
 
   return (
-    <Field rotulo={campo.rotulo} obrigatorio={obrigatorio} erro={erro}>
+    <Field rotulo={campo.rotulo} obrigatorio={obrigatorio} erro={erro} ajuda={campo.ajuda}>
       {(id, describedBy) => {
         const comum = { id, name: campo.nome, "aria-describedby": describedBy, invalido: Boolean(erro) };
         switch (campo.tipo) {
@@ -173,6 +195,20 @@ function CampoInput({ campo, valor, erro }: { campo: Campo; valor: unknown; erro
                 ))}
               </Select>
             );
+          case "simnao":
+            return <SimNao nome={campo.nome} valor={valorStr} erro={erro} />;
+          case "radio":
+            return (
+              <RadioGroup
+                nome={campo.nome}
+                opcoes={campo.opcoes}
+                valor={valorStr}
+                erro={erro}
+                colunas={campo.opcoes.length > 3 ? 2 : 1}
+              />
+            );
+          case "multi":
+            return <CheckboxGroup nome={campo.nome} opcoes={campo.opcoes} valores={valorArr} />;
           case "numero":
             return (
               <NumberScale
@@ -188,7 +224,8 @@ function CampoInput({ campo, valor, erro }: { campo: Campo; valor: unknown; erro
             return <TextInput {...comum} type="date" defaultValue={valorStr} />;
           default:
             if (campo.nome === "telefone") return <PhoneInput {...comum} defaultValue={valorStr} />;
-            if (campo.nome === "email") return <TextInput {...comum} type="email" inputMode="email" autoComplete="email" defaultValue={valorStr} placeholder={campo.placeholder} />;
+            if (campo.nome === "email")
+              return <TextInput {...comum} type="email" inputMode="email" autoComplete="email" defaultValue={valorStr} placeholder={campo.placeholder} />;
             if (campo.nome === "nome") return <TextInput {...comum} autoComplete="name" defaultValue={valorStr} placeholder={campo.placeholder} />;
             return <TextInput {...comum} defaultValue={valorStr} placeholder={campo.placeholder} />;
         }

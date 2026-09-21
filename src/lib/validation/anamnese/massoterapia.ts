@@ -1,35 +1,64 @@
 import { z } from "zod";
-import { checkbox, inteiro, textoOpcional } from "./comum";
+import { exigirQuando, multiEnum, simNao, textoOpcional } from "./comum";
 
-/** Perguntas provisórias da anamnese de Massoterapia. Ajustar com as terapeutas. */
-export const massoterapiaSchema = z.object({
-  // queixa
-  queixaPrincipal: z.string().trim().min(3, "Descreva a queixa principal").max(2000),
-  tempoQueixa: textoOpcional,
-  nivelDor: inteiro(0, 10).default(0),
-  regioesDor: textoOpcional,
-  tratamentosAnteriores: textoOpcional,
+export const OBJETIVOS_MASSAGEM = [
+  "RELAXAMENTO",
+  "REDUCAO_ESTRESSE",
+  "ALIVIO_DORES",
+  "RELAXAMENTO_MUSCULAR",
+  "BEM_ESTAR",
+  "OUTRO",
+] as const;
 
-  // saúde
-  doencasCronicas: textoOpcional,
-  cirurgias: textoOpcional,
-  medicamentos: textoOpcional,
-  alergias: textoOpcional,
-  gestante: checkbox,
-  lactante: checkbox,
-  marcapassoProtese: checkbox,
-  varizesTrombose: checkbox,
-  pressaoArterial: z.enum(["BAIXA", "NORMAL", "ALTA"]).default("NORMAL"),
+/** Perguntas oficiais da ficha de Massoterapia (papel, 2026-09-21). Objeto puro, sem refinements. */
+export const massoterapiaCampos = z.object({
+  // 2. objetivo do atendimento
+  objetivos: multiEnum(OBJETIVOS_MASSAGEM, 1),
+  objetivoOutro: textoOpcional,
+  regiaoAtencao: textoOpcional,
 
-  // hábitos
-  qualidadeSono: z.enum(["RUIM", "REGULAR", "BOA"]).default("REGULAR"),
-  nivelEstresse: inteiro(1, 5).default(3),
-  atividadeFisica: textoOpcional,
+  // 3. condições de saúde
+  problemaCardiaco: simNao,
+  problemaCardiacoQual: textoOpcional,
+  problemaRespiratorio: simNao,
+  problemaRespiratorioQual: textoOpcional,
+  problemaColuna: simNao,
+  problemaColunaQual: textoOpcional,
+  problemaMuscular: simNao,
+  problemaMuscularQual: textoOpcional,
+  problemaPele: simNao,
+  problemaPeleQual: textoOpcional,
+  pressaoArterial: z.enum(["NAO", "SIM", "NAO_SEI"], { error: "Escolha uma opção" }),
+  medicamentoContinuo: simNao,
+  medicamentoQuais: textoOpcional,
+  alergiaProdutos: simNao,
+  alergiaProdutosQual: textoOpcional,
+  gestante: simNao,
+  gestanteSemanas: textoOpcional,
+  outraCondicao: textoOpcional,
 
-  // preferências
-  pressaoToque: z.enum(["LEVE", "MEDIA", "FORTE"]).default("MEDIA"),
-  regioesEvitar: textoOpcional,
-  observacoes: textoOpcional,
+  // 4. preferências para a massagem
+  produto: z.enum(["OLEO", "CREME", "SEM_PREFERENCIA"], { error: "Escolha uma opção" }),
+  pressao: z.enum(["LEVE", "MODERADA", "FORTE"], { error: "Escolha uma opção" }),
+  regiaoEvitar: textoOpcional,
+  jaFezMassagem: simNao,
+  experienciaAnterior: textoOpcional,
+  naoGostou: textoOpcional,
+  preferencias: textoOpcional,
 });
 
+/** Regras condicionais. Aplicadas no schema completo e, à parte, na validação por etapa. */
+export function massoterapiaRegras(d: Record<string, unknown>, ctx: z.RefinementCtx) {
+  exigirQuando("objetivos", "objetivoOutro", "Descreva o objetivo")(d, ctx);
+  exigirQuando("problemaCardiaco", "problemaCardiacoQual")(d, ctx);
+  exigirQuando("problemaRespiratorio", "problemaRespiratorioQual")(d, ctx);
+  exigirQuando("problemaColuna", "problemaColunaQual")(d, ctx);
+  exigirQuando("problemaMuscular", "problemaMuscularQual")(d, ctx);
+  exigirQuando("problemaPele", "problemaPeleQual")(d, ctx);
+  exigirQuando("medicamentoContinuo", "medicamentoQuais", "Informe quais")(d, ctx);
+  exigirQuando("alergiaProdutos", "alergiaProdutosQual")(d, ctx);
+  exigirQuando("gestante", "gestanteSemanas", "Informe quantas semanas")(d, ctx);
+}
+
+export const massoterapiaSchema = massoterapiaCampos.superRefine(massoterapiaRegras);
 export type FichaMassoterapiaInput = z.infer<typeof massoterapiaSchema>;

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { TipoFicha } from "@/generated/prisma/enums";
 import { consentimentoSchema, dadosPessoaisSchema, honeypotSchema } from "./comum";
-import { depilacaoSchema } from "./depilacao";
-import { headSpaSchema } from "./head-spa";
-import { massoterapiaSchema } from "./massoterapia";
+import { depilacaoCampos, depilacaoRegras } from "./depilacao";
+import { headSpaCampos, headSpaRegras } from "./head-spa";
+import { massoterapiaCampos, massoterapiaRegras } from "./massoterapia";
 
 export * from "./comum";
 export * from "./massoterapia";
@@ -41,21 +41,55 @@ const base = dadosPessoaisSchema.extend(consentimentoSchema.shape).extend(honeyp
 
 /** Schema completo do envio público: dados pessoais + consentimento + perguntas do tipo. */
 export const ENVIO_SCHEMA = {
-  MASSOTERAPIA: base.extend(massoterapiaSchema.shape),
-  HEAD_SPA: base.extend(headSpaSchema.shape),
-  DEPILACAO: base.extend(depilacaoSchema.shape),
+  MASSOTERAPIA: base.extend(massoterapiaCampos.shape).superRefine(massoterapiaRegras),
+  HEAD_SPA: base.extend(headSpaCampos.shape).superRefine(headSpaRegras),
+  DEPILACAO: base.extend(depilacaoCampos.shape).superRefine(depilacaoRegras),
 } as const;
+
+/**
+ * Regras condicionais por tipo, expostas separadamente porque o Zod não executa o
+ * superRefine quando já há outros erros. O formulário em etapas as roda à parte.
+ */
+export const REGRAS_POR_TIPO: Record<TipoFicha, ((d: Record<string, unknown>, ctx: z.RefinementCtx) => void) | null> = {
+  MASSOTERAPIA: massoterapiaRegras,
+  HEAD_SPA: headSpaRegras,
+  DEPILACAO: depilacaoRegras,
+};
+
+/** Roda as regras condicionais sobre valores brutos e devolve { campo: mensagem }. */
+export function errosDasRegras(tipo: TipoFicha, valores: Record<string, unknown>) {
+  const regras = REGRAS_POR_TIPO[tipo];
+  if (!regras) return {} as Record<string, string>;
+  const issues: z.core.$ZodIssue[] = [];
+  const ctx = { addIssue: (i: z.core.$ZodRawIssue) => issues.push({ ...i, path: i.path ?? [] } as z.core.$ZodIssue), value: valores } as unknown as z.RefinementCtx;
+  regras(valores, ctx);
+  const saida: Record<string, string> = {};
+  for (const i of issues) {
+    const campo = i.path.join(".") || "_form";
+    if (!saida[campo]) saida[campo] = i.message;
+  }
+  return saida;
+}
 
 export type EnvioInput = {
   [K in TipoFicha]: z.infer<(typeof ENVIO_SCHEMA)[K]>;
 };
 
-/** Converte FormData em objeto simples. Ignora campos internos (prefixo `_`) e do Next ($ACTION). */
+/**
+ * Converte FormData em objeto simples. Ignora campos internos (prefixo `_`) e do Next ($ACTION).
+ * Chaves repetidas (checkboxes de seleção múltipla) viram array.
+ */
 export function formDataParaObjeto(formData: FormData) {
   const obj: Record<string, unknown> = {};
   for (const [chave, valor] of formData.entries()) {
     if (chave.startsWith("$ACTION") || chave.startsWith("_")) continue;
-    obj[chave] = typeof valor === "string" ? valor : undefined;
+    const v = typeof valor === "string" ? valor : undefined;
+    if (chave in obj) {
+      const atual = obj[chave];
+      obj[chave] = Array.isArray(atual) ? [...atual, v] : [atual, v];
+    } else {
+      obj[chave] = v;
+    }
   }
   return obj;
 }

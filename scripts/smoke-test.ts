@@ -34,9 +34,40 @@ const pessoais = {
 };
 
 const formularios = {
-  MASSOTERAPIA: { ...pessoais, queixaPrincipal: "Dor lombar", nivelDor: "6", gestante: "on", pressaoArterial: "NORMAL", qualidadeSono: "BOA", nivelEstresse: "4", pressaoToque: "FORTE" },
-  HEAD_SPA: { ...pessoais, tipoCabelo: "Cacheado", tipoCouro: "OLEOSO", frequenciaLavagem: "ALTERNADA", objetivo: "Reduzir oleosidade", quedaCabelo: "on", dataQuimica: "2026-08-01" },
-  DEPILACAO: { ...pessoais, areas: "Pernas e axilas", metodoPreferido: "CERA_QUENTE", tipoPele: "SENSIVEL", pelosEncravados: "on", ultimaDepilacao: "2026-08-15" },
+  MASSOTERAPIA: {
+    ...pessoais,
+    objetivos: ["ALIVIO_DORES", "OUTRO"],
+    objetivoOutro: "Melhorar o sono",
+    regiaoAtencao: "Lombar",
+    problemaCardiaco: "sim", problemaCardiacoQual: "Arritmia leve",
+    problemaRespiratorio: "nao", problemaColuna: "nao", problemaMuscular: "nao", problemaPele: "nao",
+    pressaoArterial: "NAO_SEI",
+    medicamentoContinuo: "nao", alergiaProdutos: "nao",
+    gestante: "sim", gestanteSemanas: "20",
+    produto: "OLEO", pressao: "FORTE",
+    jaFezMassagem: "sim", experienciaAnterior: "Relaxante, gostei",
+  },
+  HEAD_SPA: {
+    ...pessoais,
+    objetivos: ["RELAXAMENTO", "OUTRO"],
+    objetivoOutro: "Brilho",
+    couroSensivel: "sim", coceira: "nao", descamacaoCaspa: "nao", oleosidadeExcessiva: "sim",
+    feridasLesoes: "nao", vermelhidaoIrritacao: "nao", dorSensibilidadeToque: "nao", quedaIntensa: "nao",
+    doencaCouro: "nao", alergia: "sim", alergiaQual: "Níquel", gestante: "nao", problemaCardiaco: "nao",
+    medicamentoContinuo: "nao", tipoCabelo: "CACHEADO", quimicaColoracao: "sim", quimicaQual: "Coloração",
+    intensidadeMassagem: "FORTE",
+  },
+  DEPILACAO: {
+    ...pessoais,
+    areas: ["AXILAS", "OUTRA"],
+    areaOutra: "Nuca",
+    peleSensivel: "sim", alergiaCosmetico: "sim", alergiaCosmeticoQual: "Cera com resina",
+    doencaPele: "nao", feridasCortes: "nao", irritacaoVermelhidao: "nao", foliculiteEncravados: "sim", manchasSensibilidade: "nao",
+    gestante: "nao", medicamentoContinuo: "nao", produtoAcne: "sim", produtoAcneQual: "Ácido retinoico",
+    procedimentoEstetico: "nao", alergiaConhecida: "nao",
+    jaDepilou: "sim", metodos: ["CERA_QUENTE", "LASER"], laserDetalhe: "Axilas, 2025", reacaoAnterior: "nao",
+    preferencias: "Cera morna",
+  },
 } as const;
 
 async function limpar() {
@@ -58,9 +89,25 @@ async function main() {
     // validação
     const semTermos = ENVIO_SCHEMA.MASSOTERAPIA.safeParse({ ...formularios.MASSOTERAPIA, aceitaTermos: "" });
     ok(!semTermos.success, "rejeita sem aceitar termos");
+    const semSemanas = ENVIO_SCHEMA.MASSOTERAPIA.safeParse({ ...formularios.MASSOTERAPIA, gestanteSemanas: "" });
+    ok(!semSemanas.success && JSON.stringify(semSemanas.error?.issues).includes("gestanteSemanas"), "massoterapia exige semanas quando gestante = sim");
+    const semCardiaco = ENVIO_SCHEMA.MASSOTERAPIA.safeParse({ ...formularios.MASSOTERAPIA, problemaCardiacoQual: "" });
+    ok(!semCardiaco.success && JSON.stringify(semCardiaco.error?.issues).includes("problemaCardiacoQual"), "massoterapia exige 'qual' quando problema cardíaco = sim");
     const semAreas = ENVIO_SCHEMA.DEPILACAO.safeParse({ ...formularios.DEPILACAO, areas: "" });
     ok(!semAreas.success, "depilação exige áreas");
+    const semMetodos = ENVIO_SCHEMA.DEPILACAO.safeParse({ ...formularios.DEPILACAO, metodos: undefined, laserDetalhe: "" });
+    ok(!semMetodos.success && JSON.stringify(semMetodos.error?.issues).includes("metodos"), "depilação exige método quando já depilou");
+    const semQualDep = ENVIO_SCHEMA.DEPILACAO.safeParse({ ...formularios.DEPILACAO, alergiaCosmeticoQual: "" });
+    ok(!semQualDep.success && JSON.stringify(semQualDep.error?.issues).includes("alergiaCosmeticoQual"), "depilação exige 'qual' quando alergia a cosmético = sim");
+    const semLaser = ENVIO_SCHEMA.DEPILACAO.safeParse({ ...formularios.DEPILACAO, laserDetalhe: "" });
+    ok(!semLaser.success && JSON.stringify(semLaser.error?.issues).includes("laserDetalhe"), "depilação exige detalhe do laser quando LASER marcado");
     ok(ehBot({ site: "http://spam" }) && !ehBot({ site: "" }), "honeypot detecta bot");
+    const semQual = ENVIO_SCHEMA.HEAD_SPA.safeParse({ ...formularios.HEAD_SPA, alergiaQual: "" });
+    ok(!semQual.success && JSON.stringify(semQual.error?.issues).includes("alergiaQual"), "head spa exige 'qual' quando alergia = sim");
+    const semSimNao = ENVIO_SCHEMA.HEAD_SPA.safeParse({ ...formularios.HEAD_SPA, coceira: undefined });
+    ok(!semSimNao.success, "head spa exige resposta sim/não");
+    const soUmObjetivo = ENVIO_SCHEMA.HEAD_SPA.safeParse({ ...formularios.HEAD_SPA, objetivos: "RELAXAMENTO", objetivoOutro: "" });
+    ok(soUmObjetivo.success && soUmObjetivo.data.objetivos.length === 1, "head spa aceita um único objetivo como string");
 
     // envio dos 3 tipos
     for (const tipo of TIPOS) {
@@ -84,14 +131,18 @@ async function main() {
     const lista = await listarFichas("MASSOTERAPIA", { busca: "teste" });
     ok(lista.filter((f) => f.paciente.id === pacientes[0].id).length === 2, "listagem por busca traz as 2 fichas");
     const detalhe = await obterFicha("MASSOTERAPIA", lista[0].id);
-    ok(detalhe && "gestante" in detalhe && detalhe.gestante === true && "nivelDor" in detalhe && detalhe.nivelDor === 6, "detalhe com colunas corretas");
+    ok(detalhe && "produto" in detalhe && detalhe.objetivos.length === 2 && detalhe.pressaoArterial === "NAO_SEI" && detalhe.gestanteSemanas === "20" && detalhe.produto === "OLEO" && detalhe.jaFezMassagem === true, "massoterapia salva com colunas corretas");
     await revisarFicha("MASSOTERAPIA", lista[0].id, terapeuta.id, "Revisado no teste");
     const revisada = await obterFicha("MASSOTERAPIA", lista[0].id);
     ok(revisada?.status === "REVISADA" && revisada.revisadaPor?.id === terapeuta.id, "revisão registrada");
 
+    const hs = await listarFichas("HEAD_SPA", { busca: TELEFONE });
+    const hsDetalhe = await obterFicha("HEAD_SPA", hs[0].id);
+    ok(hsDetalhe && "tipoCabelo" in hsDetalhe && hsDetalhe.objetivos.length === 2 && hsDetalhe.couroSensivel === true && hsDetalhe.alergiaQual === "Níquel" && hsDetalhe.tipoCabelo === "CACHEADO", "head spa salva com colunas corretas");
+
     const dep = await listarFichas("DEPILACAO", { busca: TELEFONE });
     const depDetalhe = await obterFicha("DEPILACAO", dep[0].id);
-    ok(depDetalhe && "tipoPele" in depDetalhe && depDetalhe.tipoPele === "SENSIVEL" && depDetalhe.pelosEncravados === true, "depilação salva com colunas corretas");
+    ok(depDetalhe && "areas" in depDetalhe && depDetalhe.areas.length === 2 && depDetalhe.metodos.includes("LASER") && depDetalhe.peleSensivel === true && depDetalhe.areaOutra === "Nuca", "depilação salva com colunas corretas");
 
     const contagem = await contarPorTipo();
     ok(contagem.porTipo.MASSOTERAPIA.total >= 2 && contagem.totalPacientes >= 1, "contagem por tipo e pacientes");

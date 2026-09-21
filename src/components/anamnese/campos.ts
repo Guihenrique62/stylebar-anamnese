@@ -5,13 +5,22 @@ import type { TipoFicha } from "@/generated/prisma/enums";
  * e para exibir a ficha no admin com rótulos legíveis. Nomes batem com o schema Zod
  * e com as colunas do Prisma.
  */
-export type Campo =
-  | { nome: string; rotulo: string; tipo: "texto"; obrigatorio?: boolean; placeholder?: string }
-  | { nome: string; rotulo: string; tipo: "textarea"; obrigatorio?: boolean }
-  | { nome: string; rotulo: string; tipo: "numero"; min: number; max: number; padrao?: number }
-  | { nome: string; rotulo: string; tipo: "data" }
-  | { nome: string; rotulo: string; tipo: "checkbox" }
-  | { nome: string; rotulo: string; tipo: "select"; opcoes: { valor: string; rotulo: string }[] };
+export type Opcao = { valor: string; rotulo: string };
+
+/** Mostra o campo só quando outro campo tiver o valor indicado (ex.: "Qual?" após Sim). */
+export type Dependencia = { campo: string; valor: string };
+
+export type Campo = (
+  | { tipo: "texto"; obrigatorio?: boolean; placeholder?: string }
+  | { tipo: "textarea"; obrigatorio?: boolean }
+  | { tipo: "numero"; min: number; max: number; padrao?: number }
+  | { tipo: "data" }
+  | { tipo: "checkbox" }
+  | { tipo: "simnao" }
+  | { tipo: "select"; opcoes: Opcao[] }
+  | { tipo: "radio"; opcoes: Opcao[] }
+  | { tipo: "multi"; opcoes: Opcao[] }
+) & { nome: string; rotulo: string; ajuda?: string; dependeDe?: Dependencia };
 
 export type Secao = { titulo: string; campos: Campo[] };
 
@@ -25,217 +34,315 @@ export const DADOS_PESSOAIS: Secao = {
   ],
 };
 
-export const CONSENTIMENTO: Secao = {
-  titulo: "Consentimento",
-  campos: [
-    { nome: "aceitaTermos", rotulo: "Declaro que as informações são verdadeiras e autorizo o uso para o atendimento", tipo: "checkbox" },
-    { nome: "aceitaImagem", rotulo: "Autorizo o uso de imagem para acompanhamento do tratamento", tipo: "checkbox" },
-  ],
+/** Texto do termo/declaração por tipo (substitui a assinatura da ficha em papel). */
+export const DECLARACAO_POR_TIPO: Record<TipoFicha, string> = {
+  MASSOTERAPIA:
+    "Declaro que as informações fornecidas nesta ficha são verdadeiras e completas, e estou ciente de que devo informar à terapeuta qualquer alteração em meu estado de saúde ou qualquer desconforto durante o atendimento.",
+  HEAD_SPA: "Declaro que as informações acima são verdadeiras e completas",
+  DEPILACAO:
+    "Declaro que forneci informações verdadeiras sobre minha saúde, alergias, medicamentos e condições da pele. Estou ciente de que devo informar à profissional qualquer desconforto ou reação durante o procedimento.",
 };
 
-const SIM_NAO_TEXTO = (nome: string, rotulo: string): Campo => ({ nome, rotulo, tipo: "checkbox" });
+export function consentimento(tipo: TipoFicha): Secao {
+  return {
+    titulo: tipo === "DEPILACAO" ? "Termo de ciência" : "Declaração",
+    campos: [
+      {
+        nome: "aceitaTermos",
+        rotulo: DECLARACAO_POR_TIPO[tipo],
+        tipo: "checkbox",
+        ajuda: "Sua assinatura é registrada com a data e a hora do envio.",
+      },
+    ],
+  };
+}
+
+const SIM_NAO = (nome: string, rotulo: string): Campo => ({ nome, rotulo, tipo: "simnao" });
+const QUAL = (nome: string, dependeDe: string, rotulo = "Qual?"): Campo => ({
+  nome,
+  rotulo,
+  tipo: "texto",
+  dependeDe: { campo: dependeDe, valor: "sim" },
+});
 
 export const SECOES_POR_TIPO: Record<TipoFicha, Secao[]> = {
   MASSOTERAPIA: [
     {
-      titulo: "Queixa",
+      titulo: "Objetivo do atendimento",
       campos: [
-        { nome: "queixaPrincipal", rotulo: "Queixa principal", tipo: "textarea", obrigatorio: true },
-        { nome: "tempoQueixa", rotulo: "Há quanto tempo?", tipo: "texto" },
-        { nome: "nivelDor", rotulo: "Nível de dor (0 a 10)", tipo: "numero", min: 0, max: 10, padrao: 0 },
-        { nome: "regioesDor", rotulo: "Regiões de dor", tipo: "texto" },
-        { nome: "tratamentosAnteriores", rotulo: "Tratamentos anteriores", tipo: "textarea" },
+        {
+          nome: "objetivos",
+          rotulo: "Qual é o principal objetivo da sua massagem?",
+          ajuda: "Pode marcar mais de uma opção.",
+          tipo: "multi",
+          opcoes: [
+            { valor: "RELAXAMENTO", rotulo: "Relaxamento" },
+            { valor: "REDUCAO_ESTRESSE", rotulo: "Redução de estresse/tensão" },
+            { valor: "ALIVIO_DORES", rotulo: "Alívio de dores ou desconfortos" },
+            { valor: "RELAXAMENTO_MUSCULAR", rotulo: "Relaxamento muscular" },
+            { valor: "BEM_ESTAR", rotulo: "Bem-estar" },
+            { valor: "OUTRO", rotulo: "Outro" },
+          ],
+        },
+        { nome: "objetivoOutro", rotulo: "Qual outro objetivo?", tipo: "texto", dependeDe: { campo: "objetivos", valor: "OUTRO" } },
+        { nome: "regiaoAtencao", rotulo: "Região do corpo que gostaria de receber maior atenção", tipo: "textarea" },
       ],
     },
     {
-      titulo: "Saúde",
+      titulo: "Condições de saúde",
       campos: [
-        { nome: "doencasCronicas", rotulo: "Doenças crônicas", tipo: "texto" },
-        { nome: "cirurgias", rotulo: "Cirurgias", tipo: "texto" },
-        { nome: "medicamentos", rotulo: "Medicamentos em uso", tipo: "texto" },
-        { nome: "alergias", rotulo: "Alergias", tipo: "texto" },
-        SIM_NAO_TEXTO("gestante", "Gestante"),
-        SIM_NAO_TEXTO("lactante", "Lactante"),
-        SIM_NAO_TEXTO("marcapassoProtese", "Marcapasso ou próteses metálicas"),
-        SIM_NAO_TEXTO("varizesTrombose", "Varizes ou histórico de trombose"),
+        SIM_NAO("problemaCardiaco", "Problemas cardíacos?"),
+        QUAL("problemaCardiacoQual", "problemaCardiaco"),
+        SIM_NAO("problemaRespiratorio", "Problemas respiratórios?"),
+        QUAL("problemaRespiratorioQual", "problemaRespiratorio"),
+        SIM_NAO("problemaColuna", "Problemas ou alterações na coluna?"),
+        QUAL("problemaColunaQual", "problemaColuna"),
+        SIM_NAO("problemaMuscular", "Problemas musculares ou articulares?"),
+        QUAL("problemaMuscularQual", "problemaMuscular"),
+        SIM_NAO("problemaPele", "Problemas ou alterações na pele?"),
+        QUAL("problemaPeleQual", "problemaPele"),
         {
           nome: "pressaoArterial",
-          rotulo: "Pressão arterial",
-          tipo: "select",
+          rotulo: "Possui pressão alta ou baixa?",
+          tipo: "radio",
           opcoes: [
-            { valor: "BAIXA", rotulo: "Baixa" },
-            { valor: "NORMAL", rotulo: "Normal" },
-            { valor: "ALTA", rotulo: "Alta" },
+            { valor: "NAO", rotulo: "Não" },
+            { valor: "SIM", rotulo: "Sim" },
+            { valor: "NAO_SEI", rotulo: "Não sei" },
           ],
         },
+        SIM_NAO("medicamentoContinuo", "Faz uso contínuo de medicamentos?"),
+        QUAL("medicamentoQuais", "medicamentoContinuo", "Quais?"),
+        SIM_NAO("alergiaProdutos", "Possui alguma alergia ou sensibilidade a produtos?"),
+        QUAL("alergiaProdutosQual", "alergiaProdutos"),
+        SIM_NAO("gestante", "Está gestante?"),
+        QUAL("gestanteSemanas", "gestante", "Quantas semanas?"),
+        { nome: "outraCondicao", rotulo: "Existe alguma outra condição de saúde que devemos saber?", tipo: "textarea" },
       ],
     },
     {
-      titulo: "Hábitos",
+      titulo: "Preferências para a massagem",
       campos: [
         {
-          nome: "qualidadeSono",
-          rotulo: "Qualidade do sono",
-          tipo: "select",
+          nome: "produto",
+          rotulo: "Qual produto prefere?",
+          tipo: "radio",
           opcoes: [
-            { valor: "RUIM", rotulo: "Ruim" },
-            { valor: "REGULAR", rotulo: "Regular" },
-            { valor: "BOA", rotulo: "Boa" },
+            { valor: "OLEO", rotulo: "Óleo" },
+            { valor: "CREME", rotulo: "Creme" },
+            { valor: "SEM_PREFERENCIA", rotulo: "Sem preferência" },
           ],
         },
-        { nome: "nivelEstresse", rotulo: "Nível de estresse (1 a 5)", tipo: "numero", min: 1, max: 5, padrao: 3 },
-        { nome: "atividadeFisica", rotulo: "Atividade física", tipo: "texto" },
-      ],
-    },
-    {
-      titulo: "Preferências",
-      campos: [
         {
-          nome: "pressaoToque",
-          rotulo: "Pressão de toque preferida",
-          tipo: "select",
+          nome: "pressao",
+          rotulo: "Qual intensidade de pressão você prefere?",
+          tipo: "radio",
           opcoes: [
             { valor: "LEVE", rotulo: "Leve" },
-            { valor: "MEDIA", rotulo: "Média" },
+            { valor: "MODERADA", rotulo: "Moderada" },
             { valor: "FORTE", rotulo: "Forte" },
           ],
         },
-        { nome: "regioesEvitar", rotulo: "Regiões a evitar", tipo: "texto" },
-        { nome: "observacoes", rotulo: "Observações", tipo: "textarea" },
+        { nome: "regiaoEvitar", rotulo: "Há alguma região que você prefere que não seja massageada?", tipo: "textarea" },
+        SIM_NAO("jaFezMassagem", "Você já realizou algum tipo de massagem anteriormente?"),
+        {
+          nome: "experienciaAnterior",
+          rotulo: "Conte um pouco sobre sua experiência",
+          tipo: "textarea",
+          dependeDe: { campo: "jaFezMassagem", valor: "sim" },
+        },
+        {
+          nome: "naoGostou",
+          rotulo: "Houve algo que você não gostou ou que gostaria que fosse diferente?",
+          tipo: "textarea",
+          dependeDe: { campo: "jaFezMassagem", valor: "sim" },
+        },
+        {
+          nome: "preferencias",
+          rotulo: "Existe alguma preferência, cuidado ou detalhe que gostaria que soubéssemos para personalizar sua experiência?",
+          tipo: "textarea",
+        },
       ],
     },
   ],
 
   HEAD_SPA: [
     {
-      titulo: "Cabelo e couro cabeludo",
-      campos: [
-        { nome: "tipoCabelo", rotulo: "Tipo de cabelo (liso, ondulado, cacheado, crespo...)", tipo: "texto", obrigatorio: true },
-        {
-          nome: "tipoCouro",
-          rotulo: "Tipo de couro cabeludo",
-          tipo: "select",
-          opcoes: [
-            { valor: "NORMAL", rotulo: "Normal" },
-            { valor: "OLEOSO", rotulo: "Oleoso" },
-            { valor: "SECO", rotulo: "Seco" },
-            { valor: "MISTO", rotulo: "Misto" },
-            { valor: "SENSIVEL", rotulo: "Sensível" },
-          ],
-        },
-        SIM_NAO_TEXTO("quedaCabelo", "Queda de cabelo"),
-        SIM_NAO_TEXTO("caspaDescamacao", "Caspa ou descamação"),
-        SIM_NAO_TEXTO("coceiraIrritacao", "Coceira ou irritação"),
-        SIM_NAO_TEXTO("feridasLesoes", "Feridas ou lesões no couro cabeludo"),
-        SIM_NAO_TEXTO("dermatitePsoriase", "Dermatite ou psoríase"),
-        { nome: "alergiaCosmeticos", rotulo: "Alergia a cosméticos (quais?)", tipo: "texto" },
-        { nome: "quimicaRecente", rotulo: "Química recente (tipo)", tipo: "texto" },
-        { nome: "dataQuimica", rotulo: "Data da última química", tipo: "data" },
-      ],
-    },
-    {
-      titulo: "Hábitos",
+      titulo: "Objetivo do atendimento",
       campos: [
         {
-          nome: "frequenciaLavagem",
-          rotulo: "Frequência de lavagem",
-          tipo: "select",
+          nome: "objetivos",
+          rotulo: "O que você busca neste atendimento?",
+          ajuda: "Pode marcar mais de uma opção.",
+          tipo: "multi",
           opcoes: [
-            { valor: "DIARIA", rotulo: "Diária" },
-            { valor: "ALTERNADA", rotulo: "Dia sim, dia não" },
-            { valor: "DUAS_VEZES_SEMANA", rotulo: "Duas vezes por semana" },
-            { valor: "SEMANAL", rotulo: "Semanal" },
+            { valor: "RELAXAMENTO", rotulo: "Relaxamento" },
+            { valor: "REDUCAO_ESTRESSE", rotulo: "Redução de estresse/tensão" },
+            { valor: "HIGIENIZACAO_PROFUNDA", rotulo: "Higienização profunda do couro cabeludo" },
+            { valor: "CONTROLE_OLEOSIDADE", rotulo: "Controle da oleosidade" },
+            { valor: "ALIVIO_SENSIBILIDADE", rotulo: "Alívio de sensibilidade/coceira" },
+            { valor: "QUEDA_CAPILAR", rotulo: "Queda capilar" },
+            { valor: "OUTRO", rotulo: "Outro" },
           ],
         },
-        SIM_NAO_TEXTO("usoCalor", "Uso frequente de secador, chapinha ou babyliss"),
+        { nome: "objetivoOutro", rotulo: "Qual outro objetivo?", tipo: "texto", dependeDe: { campo: "objetivos", valor: "OUTRO" } },
       ],
     },
     {
-      titulo: "Saúde",
+      titulo: "Histórico capilar",
       campos: [
-        SIM_NAO_TEXTO("gestante", "Gestante"),
-        SIM_NAO_TEXTO("hipertensao", "Hipertensão"),
-        SIM_NAO_TEXTO("enxaqueca", "Enxaqueca ou dores de cabeça frequentes"),
-        SIM_NAO_TEXTO("lentesAparelhoAuditivo", "Usa lentes de contato ou aparelho auditivo"),
-        SIM_NAO_TEXTO("sensibilidadeTemperatura", "Sensibilidade a temperatura (quente/frio)"),
+        SIM_NAO("couroSensivel", "Possui couro cabeludo sensível?"),
+        SIM_NAO("coceira", "Apresenta coceira?"),
+        SIM_NAO("descamacaoCaspa", "Possui descamação ou caspa?"),
+        SIM_NAO("oleosidadeExcessiva", "Apresenta oleosidade excessiva?"),
+        SIM_NAO("feridasLesoes", "Possui feridas ou lesões no couro cabeludo?"),
+        SIM_NAO("vermelhidaoIrritacao", "Apresenta vermelhidão ou irritação?"),
+        SIM_NAO("dorSensibilidadeToque", "Sente dor ou sensibilidade ao toque?"),
+        SIM_NAO("quedaIntensa", "Apresenta queda de cabelo intensa ou recente?"),
+        SIM_NAO("doencaCouro", "Possui alguma doença ou alteração diagnosticada no couro cabeludo?"),
+        QUAL("doencaCouroQual", "doencaCouro"),
       ],
     },
     {
-      titulo: "Objetivo",
+      titulo: "Informações de saúde",
       campos: [
-        { nome: "objetivo", rotulo: "O que espera do tratamento?", tipo: "textarea", obrigatorio: true },
-        { nome: "observacoes", rotulo: "Observações", tipo: "textarea" },
+        SIM_NAO("alergia", "Possui algum tipo de alergia?"),
+        QUAL("alergiaQual", "alergia"),
+        SIM_NAO("gestante", "Está gestante?"),
+        SIM_NAO("problemaCardiaco", "Possui algum problema cardíaco?"),
+        SIM_NAO("medicamentoContinuo", "Faz uso de algum medicamento contínuo?"),
+        QUAL("medicamentoQual", "medicamentoContinuo"),
       ],
+    },
+    {
+      titulo: "Características dos cabelos",
+      campos: [
+        {
+          nome: "tipoCabelo",
+          rotulo: "Tipo de cabelo",
+          tipo: "radio",
+          opcoes: [
+            { valor: "LISO", rotulo: "Liso" },
+            { valor: "ONDULADO", rotulo: "Ondulado" },
+            { valor: "CACHEADO", rotulo: "Cacheado" },
+            { valor: "CRESPO", rotulo: "Crespo" },
+          ],
+        },
+        SIM_NAO("quimicaColoracao", "Possui química ou coloração nos cabelos?"),
+        QUAL("quimicaQual", "quimicaColoracao"),
+      ],
+    },
+    {
+      titulo: "Preferência de massagem capilar",
+      campos: [
+        {
+          nome: "intensidadeMassagem",
+          rotulo: "Qual intensidade de massagem você prefere?",
+          tipo: "radio",
+          opcoes: [
+            { valor: "SUAVE", rotulo: "Suave" },
+            { valor: "MODERADA", rotulo: "Moderada" },
+            { valor: "FORTE", rotulo: "Forte" },
+          ],
+        },
+      ],
+    },
+    {
+      titulo: "Observações",
+      campos: [{ nome: "observacoes", rotulo: "Algo mais que queira nos contar?", tipo: "textarea" }],
     },
   ],
 
   DEPILACAO: [
     {
-      titulo: "Depilação",
+      titulo: "Área a ser depilada",
       campos: [
-        { nome: "areas", rotulo: "Áreas a depilar", tipo: "texto", obrigatorio: true, placeholder: "Ex.: pernas, axilas, virilha" },
         {
-          nome: "metodoPreferido",
-          rotulo: "Método preferido",
-          tipo: "select",
+          nome: "areas",
+          rotulo: "Quais áreas serão depiladas?",
+          ajuda: "Pode marcar mais de uma opção.",
+          tipo: "multi",
+          opcoes: [
+            { valor: "BUCO", rotulo: "Buço" },
+            { valor: "ROSTO", rotulo: "Rosto" },
+            { valor: "AXILAS", rotulo: "Axilas" },
+            { valor: "BRACOS", rotulo: "Braços" },
+            { valor: "PERNAS", rotulo: "Pernas" },
+            { valor: "VIRILHA", rotulo: "Virilha" },
+            { valor: "INTIMA_COMPLETA", rotulo: "Íntima completa" },
+            { valor: "COSTAS", rotulo: "Costas" },
+            { valor: "ABDOMEN", rotulo: "Abdômen" },
+            { valor: "OUTRA", rotulo: "Outra" },
+          ],
+        },
+        { nome: "areaOutra", rotulo: "Qual outra área?", tipo: "texto", dependeDe: { campo: "areas", valor: "OUTRA" } },
+      ],
+    },
+    {
+      titulo: "Histórico da pele",
+      campos: [
+        SIM_NAO("peleSensivel", "Possui pele sensível?"),
+        SIM_NAO("alergiaCosmetico", "Apresenta alergia a algum produto ou cosmético?"),
+        QUAL("alergiaCosmeticoQual", "alergiaCosmetico"),
+        SIM_NAO("doencaPele", "Possui alguma doença ou alteração de pele?"),
+        QUAL("doencaPeleQual", "doencaPele"),
+        SIM_NAO("feridasCortes", "Possui feridas, cortes ou lesões na área a ser depilada?"),
+        SIM_NAO("irritacaoVermelhidao", "Apresenta irritação, vermelhidão ou inflamação na região?"),
+        SIM_NAO("foliculiteEncravados", "Possui foliculite ou tendência a pelos encravados?"),
+        SIM_NAO("manchasSensibilidade", "Possui manchas ou alteração de sensibilidade na região?"),
+      ],
+    },
+    {
+      titulo: "Informações de saúde",
+      campos: [
+        SIM_NAO("gestante", "Está gestante?"),
+        SIM_NAO("medicamentoContinuo", "Faz uso de medicamentos contínuos?"),
+        QUAL("medicamentoQual", "medicamentoContinuo"),
+        SIM_NAO("produtoAcne", "Utiliza algum medicamento ou produto para acne ou tratamento da pele?"),
+        QUAL("produtoAcneQual", "produtoAcne"),
+        SIM_NAO("procedimentoEstetico", "Realizou algum procedimento estético recentemente na região?"),
+        QUAL("procedimentoQualQuando", "procedimentoEstetico", "Qual e quando?"),
+        SIM_NAO("alergiaConhecida", "Possui alguma alergia conhecida?"),
+        QUAL("alergiaConhecidaQual", "alergiaConhecida"),
+      ],
+    },
+    {
+      titulo: "Histórico de depilação",
+      campos: [
+        SIM_NAO("jaDepilou", "Já realizou depilação anteriormente?"),
+        {
+          nome: "metodos",
+          rotulo: "Qual método costuma utilizar?",
+          ajuda: "Pode marcar mais de uma opção.",
+          tipo: "multi",
           opcoes: [
             { valor: "CERA_QUENTE", rotulo: "Cera quente" },
             { valor: "CERA_FRIA", rotulo: "Cera fria" },
-            { valor: "ROLL_ON", rotulo: "Roll-on" },
-            { valor: "LINHA", rotulo: "Linha" },
             { valor: "LAMINA", rotulo: "Lâmina" },
-            { valor: "OUTRO", rotulo: "Outro" },
+            { valor: "CREME_DEPILATORIO", rotulo: "Creme depilatório" },
+            { valor: "LINHA", rotulo: "Linha" },
+            { valor: "LASER", rotulo: "Laser" },
           ],
         },
-        { nome: "metodoAtual", rotulo: "Método que usa atualmente", tipo: "texto" },
-        { nome: "ultimaDepilacao", rotulo: "Data da última depilação", tipo: "data" },
-        SIM_NAO_TEXTO("primeiraVezCera", "Primeira vez com cera"),
+        { nome: "laserDetalhe", rotulo: "Laser: onde e quando?", tipo: "texto", dependeDe: { campo: "metodos", valor: "LASER" } },
+        SIM_NAO("reacaoAnterior", "Já apresentou alguma reação após depilação?"),
+        QUAL("reacaoQual", "reacaoAnterior"),
       ],
     },
     {
-      titulo: "Pele",
+      titulo: "Preferências e observações",
       campos: [
         {
-          nome: "tipoPele",
-          rotulo: "Tipo de pele",
-          tipo: "select",
-          opcoes: [
-            { valor: "NORMAL", rotulo: "Normal" },
-            { valor: "SECA", rotulo: "Seca" },
-            { valor: "OLEOSA", rotulo: "Oleosa" },
-            { valor: "MISTA", rotulo: "Mista" },
-            { valor: "SENSIVEL", rotulo: "Sensível" },
-          ],
+          nome: "preferencias",
+          rotulo: "Possui alguma preferência ou necessidade especial durante o procedimento?",
+          tipo: "textarea",
         },
-        SIM_NAO_TEXTO("pelosEncravados", "Tendência a pelos encravados"),
-        SIM_NAO_TEXTO("foliculite", "Foliculite"),
-        { nome: "lesoesPele", rotulo: "Lesões, feridas ou irritações na pele", tipo: "texto" },
-        { nome: "manchasCicatrizes", rotulo: "Manchas ou cicatrizes na região", tipo: "texto" },
-        { nome: "alergiaCosmeticos", rotulo: "Alergia a cosméticos ou cera (quais?)", tipo: "texto" },
       ],
-    },
-    {
-      titulo: "Saúde",
-      campos: [
-        SIM_NAO_TEXTO("usoAcidosRetinoides", "Uso de ácidos, retinoides, isotretinoína ou peeling recente"),
-        SIM_NAO_TEXTO("exposicaoSolarRecente", "Exposição solar ou bronzeamento nos últimos dias"),
-        SIM_NAO_TEXTO("gestante", "Gestante"),
-        SIM_NAO_TEXTO("diabetes", "Diabetes"),
-        SIM_NAO_TEXTO("varizes", "Varizes"),
-        SIM_NAO_TEXTO("problemasCirculatorios", "Problemas circulatórios"),
-        SIM_NAO_TEXTO("anticoagulantes", "Uso de anticoagulantes"),
-        { nome: "medicamentos", rotulo: "Medicamentos em uso", tipo: "texto" },
-        { nome: "alergias", rotulo: "Alergias", tipo: "texto" },
-      ],
-    },
-    {
-      titulo: "Observações",
-      campos: [{ nome: "observacoes", rotulo: "Observações", tipo: "textarea" }],
     },
   ],
 };
 
 /** Todas as seções do formulário público de um tipo, na ordem de exibição. */
 export function secoesDoFormulario(tipo: TipoFicha): Secao[] {
-  return [DADOS_PESSOAIS, ...SECOES_POR_TIPO[tipo], CONSENTIMENTO];
+  return [DADOS_PESSOAIS, ...SECOES_POR_TIPO[tipo], consentimento(tipo)];
 }

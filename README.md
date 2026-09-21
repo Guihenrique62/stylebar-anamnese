@@ -93,7 +93,15 @@ Regra: páginas e route handlers nunca acessam o banco diretamente. Eles chamam 
 
 ## Banco de dados
 
-Tabelas: `terapeutas`, `pacientes`, `fichas_massoterapia`, `fichas_head_spa`, `fichas_depilacao`. Uma paciente (telefone único) pode ter várias fichas de cada tipo. Cada ficha tem colunas fixas por pergunta (definidas provisoriamente em `prisma/schema.prisma`; rótulos em `src/components/anamnese/campos.ts`).
+Tabelas: `terapeutas`, `pacientes`, `fichas_massoterapia`, `fichas_head_spa`, `fichas_depilacao`. Uma paciente (telefone único) pode ter várias fichas de cada tipo. Cada ficha tem colunas fixas por pergunta (`prisma/schema.prisma`; rótulos e seções em `src/components/anamnese/campos.ts`; validação em `src/lib/validation/anamnese`).
+
+| Ficha | Perguntas |
+| --- | --- |
+| Head Spa | Oficiais, transcritas da ficha em papel (objetivos múltiplos, 9 perguntas Sim/Não de histórico capilar, saúde, tipo de cabelo, intensidade de massagem) |
+| Massoterapia | Oficiais, transcritas da ficha em papel (objetivos múltiplos, condições de saúde em Sim/Não com "Qual?", pressão arterial Não/Sim/Não sei, gestação com semanas, produto e pressão preferidos, experiência anterior, declaração própria) |
+| Depilação | Oficiais, transcritas da ficha em papel (áreas múltiplas, histórico da pele e saúde em Sim/Não com "Qual?", histórico de depilação com métodos múltiplos e detalhe do laser, preferências, termo de ciência) |
+
+Tipos de campo suportados pelo formulário: texto, textarea, data, número em escala, checkbox, Sim/Não, escolha única (radio), seleção múltipla e campos condicionais (`dependeDe`, ex.: "Qual?" só aparece após Sim). A assinatura da ficha em papel virou a declaração obrigatória na última etapa (texto por tipo em `DECLARACAO_POR_TIPO`), com a data registrada em `enviada_em`. A assinatura da profissional corresponde à revisão no admin.
 
 ## Rodando localmente
 
@@ -120,7 +128,9 @@ Abra http://localhost:3000. Node 26 (ver `.nvmrc`).
 
 ## Próximos passos
 
-- [ ] Validar com as terapeutas as perguntas de cada formulário e ajustar schema + `campos.ts`
+- [x] Head Spa com perguntas oficiais
+- [x] Depilação com perguntas oficiais
+- [x] Massoterapia com perguntas oficiais
 - [ ] Recuperação de senha (Supabase Auth)
 - [ ] Deploy na Vercel
 
